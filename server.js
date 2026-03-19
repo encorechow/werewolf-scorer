@@ -82,6 +82,17 @@ app.post('/api/logout', (req, res) => {
   res.json({ ok: true });
 });
 
+// Read-write lock for data.json
+let lockQueue = Promise.resolve();
+
+function withLock(fn) {
+  let release;
+  const next = new Promise(resolve => { release = resolve; });
+  const wait = lockQueue;
+  lockQueue = next;
+  return wait.then(() => fn().finally(release));
+}
+
 function readData() {
   if (!fs.existsSync(DATA_FILE)) {
     return { players: [], games: [] };
@@ -95,36 +106,44 @@ function writeData(data) {
 
 // Get all data
 app.get('/api/data', (req, res) => {
-  res.json(readData());
+  withLock(async () => {
+    res.json(readData());
+  });
 });
 
 // Update players
 app.put('/api/players', (req, res) => {
-  const data = readData();
-  data.players = req.body.players;
-  writeData(data);
-  res.json({ ok: true });
+  withLock(async () => {
+    const data = readData();
+    data.players = req.body.players;
+    writeData(data);
+    res.json({ ok: true });
+  });
 });
 
 // Add a game
 app.post('/api/games', (req, res) => {
-  const data = readData();
-  data.games.push(req.body.game);
-  writeData(data);
-  res.json({ ok: true, total: data.games.length });
+  withLock(async () => {
+    const data = readData();
+    data.games.push(req.body.game);
+    writeData(data);
+    res.json({ ok: true, total: data.games.length });
+  });
 });
 
 // Delete a game
 app.delete('/api/games/:idx', (req, res) => {
-  const data = readData();
-  const idx = parseInt(req.params.idx);
-  if (idx >= 0 && idx < data.games.length) {
-    data.games.splice(idx, 1);
-    writeData(data);
-    res.json({ ok: true });
-  } else {
-    res.status(404).json({ error: 'not found' });
-  }
+  withLock(async () => {
+    const data = readData();
+    const idx = parseInt(req.params.idx);
+    if (idx >= 0 && idx < data.games.length) {
+      data.games.splice(idx, 1);
+      writeData(data);
+      res.json({ ok: true });
+    } else {
+      res.status(404).json({ error: 'not found' });
+    }
+  });
 });
 
 app.listen(PORT, () => {
