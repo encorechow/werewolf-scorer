@@ -44,9 +44,9 @@ function getToken(req) {
   return match ? match[1] : null;
 }
 
-// Auth middleware - skip login route and login page
+// Auth middleware - skip login route, login page, and public leaderboard
 function authMiddleware(req, res, next) {
-  if (req.path === '/api/login' || req.path === '/login.html') {
+  if (req.path === '/api/login' || req.path === '/login.html' || req.path === '/leaderboard.html' || req.path === '/api/leaderboard') {
     return next();
   }
   const token = getToken(req);
@@ -103,6 +103,25 @@ function readData() {
 function writeData(data) {
   fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
+
+// Public leaderboard data
+app.get('/api/leaderboard', (req, res) => {
+  withLock(async () => {
+    const data = readData();
+    const stats = {};
+    data.games.forEach(g => {
+      g.entries.forEach(e => {
+        if (!stats[e.player]) stats[e.player] = { total: 0, games: 0 };
+        stats[e.player].total += e.total;
+        stats[e.player].games += 1;
+      });
+    });
+    const sorted = Object.entries(stats)
+      .map(([name, s]) => ({ name, ...s, avg: +(s.total / s.games).toFixed(1) }))
+      .sort((a, b) => b.total - a.total);
+    res.json(sorted);
+  });
+});
 
 // Get all data
 app.get('/api/data', (req, res) => {

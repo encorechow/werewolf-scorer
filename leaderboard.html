@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>排行榜 - 狼人杀积分系统</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg-deep: #0a0b10;
+  --bg-card: #12141d;
+  --bg-card-hover: #181b27;
+  --border: #2a2d3d;
+  --text: #e0ddd5;
+  --text-dim: #7a7d8a;
+  --text-bright: #f5f3ed;
+  --gold: #d4a854;
+  --gold-glow: #d4a85440;
+  --font-display: 'Cinzel', 'Noto Serif SC', serif;
+  --font-body: 'Noto Sans SC', sans-serif;
+}
+html { font-size: 15px; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg-deep);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: -20%;
+  right: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #1a2a4a22 0%, transparent 70%);
+  pointer-events: none;
+}
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+.header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.header h1 {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--text-bright);
+  margin-bottom: 0.3rem;
+}
+.header .subtitle {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  margin-bottom: 0.8rem;
+}
+.header .divider {
+  width: 50px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  margin: 0 auto;
+}
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.5rem;
+}
+.card-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid #ffffff06;
+  transition: background 0.15s;
+}
+.leaderboard-row:hover { background: #ffffff04; }
+.leaderboard-row .rank {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+.leaderboard-row .rank.top-1 { color: var(--gold); text-shadow: 0 0 12px var(--gold-glow); }
+.leaderboard-row .rank.top-2 { color: #b0b8c8; }
+.leaderboard-row .rank.top-3 { color: #c08a5a; }
+.leaderboard-row .name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-bright);
+}
+.leaderboard-row .games {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-right: 1.5rem;
+}
+.leaderboard-row .total-score {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--gold);
+  min-width: 60px;
+  text-align: right;
+}
+.leaderboard-row .avg-score {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  min-width: 60px;
+  text-align: right;
+}
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-dim);
+}
+.empty-state .icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.8rem;
+}
+.login-link {
+  display: block;
+  text-align: center;
+  margin-top: 1.5rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.login-link:hover { color: var(--gold); }
+@media (max-width: 480px) {
+  .leaderboard-row .games { display: none; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>WEREWOLF</h1>
+    <div class="subtitle">狼人杀积分排行榜</div>
+    <div class="divider"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">总积分排行</div>
+    <div id="leaderboardList"></div>
+    <div id="leaderboardEmpty" class="empty-state" style="display:none">
+      <div class="icon">&#x1F3C6;</div>
+      <p>暂无数据</p>
+    </div>
+  </div>
+  <a href="/login.html" class="login-link">管理员登录</a>
+</div>
+<script>
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function loadLeaderboard() {
+  try {
+    const res = await fetch('/api/leaderboard');
+    const sorted = await res.json();
+    const list = document.getElementById('leaderboardList');
+    const empty = document.getElementById('leaderboardEmpty');
+
+    if (sorted.length === 0) {
+      list.innerHTML = '';
+      empty.style.display = '';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = sorted.map((s, i) => `
+      <div class="leaderboard-row">
+        <div class="rank ${i < 3 ? 'top-' + (i + 1) : ''}">${i + 1}</div>
+        <div class="name">${esc(s.name)}</div>
+        <div class="games">${s.games} 局</div>
+        <div class="avg-score">均 ${s.avg}</div>
+        <div class="total-score">${s.total}</div>
+      </div>
+    `).join('');
+  } catch {
+    document.getElementById('leaderboardEmpty').style.display = '';
+  }
+}
+
+loadLeaderboard();
+</script>
+</body>
+</html>
