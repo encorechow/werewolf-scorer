@@ -859,8 +859,7 @@ const SKILL_OPTIONS = {
   ],
   guard: [
     { label: '—', value: 0 },
-    { label: '平安夜x1 (+2)', value: 2 },
-    { label: '平安夜x2 (+4)', value: 4 },
+    { label: '平安夜 (+2)', value: 2 },
   ],
 };
 
@@ -1067,12 +1066,24 @@ function onRoleChange(idx, roleName) {
     factionCell.textContent = '—';
     factionCell.className = 'faction-cell';
     skillCell.innerHTML = `<select disabled id="skill_${idx}"><option>—</option></select>`;
+    const voteSelect = document.getElementById(`vote_${idx}`);
+    voteSelect.value = '0';
+    voteSelect.disabled = false;
     recalcScores();
     return;
   }
 
   factionCell.textContent = role.faction === 'good' ? '好人' : '狼人';
   factionCell.className = 'faction-cell ' + (role.faction === 'good' ? 'faction-good' : 'faction-wolf');
+
+  // Vote only applies to good faction
+  const voteSelect = document.getElementById(`vote_${idx}`);
+  if (role.faction === 'good') {
+    voteSelect.disabled = false;
+  } else {
+    voteSelect.value = '0';
+    voteSelect.disabled = true;
+  }
 
   if (role.skill && SKILL_OPTIONS[role.skill]) {
     const opts = SKILL_OPTIONS[role.skill];
@@ -1092,7 +1103,8 @@ function recalcScores() {
   players.forEach((p, i) => {
     const roleSelect = document.getElementById(`role_${i}`);
     const role = ALL_ROLES[roleSelect.value];
-    const voteVal = parseInt(document.getElementById(`vote_${i}`).value) || 0;
+    const isGood = role && role.faction === 'good';
+    const voteVal = isGood ? (parseInt(document.getElementById(`vote_${i}`).value) || 0) : 0;
     const skillVal = parseInt(document.getElementById(`skill_${i}`).value) || 0;
     const extraVal = parseInt(document.getElementById(`extra_${i}`).value) || 0;
 
@@ -1128,7 +1140,8 @@ async function saveGame() {
     const roleName = document.getElementById(`role_${i}`).value;
     if (!roleName) { valid = false; return; }
     const role = ALL_ROLES[roleName];
-    const voteVal = parseInt(document.getElementById(`vote_${i}`).value) || 0;
+    const isGood = role.faction === 'good';
+    const voteVal = isGood ? (parseInt(document.getElementById(`vote_${i}`).value) || 0) : 0;
     const skillVal = parseInt(document.getElementById(`skill_${i}`).value) || 0;
     const extraVal = parseInt(document.getElementById(`extra_${i}`).value) || 0;
     const winScore = role.faction === winnerFaction ? WIN_SCORE : 0;
