@@ -827,7 +827,7 @@ const ALL_ROLES = {
   '守卫':     { faction: 'good', skill: 'guard' },
   '摄梦人':   { faction: 'good', skill: false },
   '守墓人':   { faction: 'good', skill: false },
-  '混血儿':   { faction: 'good', skill: false },
+  '混血儿':   { faction: 'follow', skill: false },
   '狼':       { faction: 'wolf', skill: false },
   '狼王':     { faction: 'wolf', skill: false },
   '机械狼':   { faction: 'wolf', skill: false },
@@ -1058,11 +1058,31 @@ function onRoleChange(idx, roleName) {
     return;
   }
 
-  const factionNames = { good: '好人', wolf: '狼人', third: '第三方' };
-  factionCell.textContent = factionNames[role.faction];
-  factionCell.className = 'faction-cell faction-' + role.faction;
+  if (role.faction === 'follow') {
+    factionCell.innerHTML = `
+      <select onchange="recalcScores()" id="follow_${idx}">
+        <option value="">选择偶像阵营</option>
+        <option value="good">好人</option>
+        <option value="wolf">狼人</option>
+        <option value="third">第三方</option>
+      </select>
+    `;
+    factionCell.className = 'faction-cell';
+  } else {
+    const factionNames = { good: '好人', wolf: '狼人', third: '第三方' };
+    factionCell.textContent = factionNames[role.faction];
+    factionCell.className = 'faction-cell faction-' + role.faction;
+  }
 
   recalcScores();
+}
+
+function getEffectiveFaction(role, idx) {
+  if (role.faction === 'follow') {
+    const sel = document.getElementById(`follow_${idx}`);
+    return sel ? sel.value : '';
+  }
+  return role.faction;
 }
 
 function recalcScores() {
@@ -1072,8 +1092,11 @@ function recalcScores() {
 
     let total = 0;
     if (role && winnerFaction) {
-      const scores = FACTION_SCORES[role.faction];
-      total = role.faction === winnerFaction ? scores.win : scores.lose;
+      const faction = getEffectiveFaction(role, i);
+      if (faction && FACTION_SCORES[faction]) {
+        const scores = FACTION_SCORES[faction];
+        total = faction === winnerFaction ? scores.win : scores.lose;
+      }
     }
 
     const el = document.getElementById(`total_${i}`);
@@ -1103,18 +1126,20 @@ async function saveGame() {
     const roleName = document.getElementById(`role_${i}`).value;
     if (!roleName) { valid = false; return; }
     const role = ALL_ROLES[roleName];
-    const scores = FACTION_SCORES[role.faction];
-    const total = role.faction === winnerFaction ? scores.win : scores.lose;
+    const faction = getEffectiveFaction(role, i);
+    if (!faction) { valid = false; return; }
+    const scores = FACTION_SCORES[faction];
+    const total = faction === winnerFaction ? scores.win : scores.lose;
 
     entries.push({
       player: p,
       role: roleName,
-      faction: role.faction,
+      faction,
       total,
     });
   });
 
-  if (!valid) { showToast('请为每个玩家选择身份'); return; }
+  if (!valid) { showToast('请为每个玩家选择身份和阵营'); return; }
 
   const game = {
     id: Date.now(),
