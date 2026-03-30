@@ -1089,9 +1089,16 @@ function recalcScores() {
   players.forEach((p, i) => {
     const roleSelect = document.getElementById(`role_${i}`);
     const role = ALL_ROLES[roleSelect.value];
+    const el = document.getElementById(`total_${i}`);
+
+    if (!role) {
+      el.textContent = '—';
+      el.className = 'player-score zero';
+      return;
+    }
 
     let total = 0;
-    if (role && winnerFaction) {
+    if (winnerFaction) {
       const faction = getEffectiveFaction(role, i);
       if (faction && FACTION_SCORES[faction]) {
         const scores = FACTION_SCORES[faction];
@@ -1099,7 +1106,6 @@ function recalcScores() {
       }
     }
 
-    const el = document.getElementById(`total_${i}`);
     el.textContent = total;
     el.className = 'player-score ' + (total > 0 ? 'positive' : total < 0 ? 'negative' : 'zero');
   });
@@ -1120,14 +1126,14 @@ async function saveGame() {
   if (!winnerFaction) { showToast('请先选择获胜阵营'); return; }
 
   const entries = [];
-  let valid = true;
+  let hasInvalid = false;
 
   players.forEach((p, i) => {
     const roleName = document.getElementById(`role_${i}`).value;
-    if (!roleName) { valid = false; return; }
+    if (!roleName) return; // skip unselected players
     const role = ALL_ROLES[roleName];
     const faction = getEffectiveFaction(role, i);
-    if (!faction) { valid = false; return; }
+    if (!faction) { hasInvalid = true; return; }
     const scores = FACTION_SCORES[faction];
     const total = faction === winnerFaction ? scores.win : scores.lose;
 
@@ -1139,7 +1145,8 @@ async function saveGame() {
     });
   });
 
-  if (!valid) { showToast('请为每个玩家选择身份和阵营'); return; }
+  if (entries.length === 0) { showToast('请至少为一位玩家选择身份'); return; }
+  if (hasInvalid) { showToast('请为参与玩家选择阵营'); return; }
 
   const game = {
     id: Date.now(),
