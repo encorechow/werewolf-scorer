@@ -643,6 +643,75 @@ select option { background: var(--bg-card); }
   text-align: center;
 }
 
+.dialog.dialog-wide {
+  max-width: 600px;
+  text-align: left;
+}
+
+.dialog.dialog-wide .edit-winner-select {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.dialog.dialog-wide .edit-winner-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.dialog.dialog-wide .edit-winner-btn.active-good {
+  border-color: var(--good-primary);
+  background: var(--good-bg);
+  color: var(--good-primary);
+}
+
+.dialog.dialog-wide .edit-winner-btn.active-wolf {
+  border-color: var(--wolf-primary);
+  background: var(--wolf-bg);
+  color: var(--wolf-primary);
+}
+
+.dialog.dialog-wide .edit-winner-btn.active-third {
+  border-color: var(--third-primary);
+  background: var(--third-bg);
+  color: var(--third-primary);
+}
+
+.dialog.dialog-wide table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.dialog.dialog-wide th {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  padding: 0.4rem;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog.dialog-wide th:first-child { text-align: left; }
+
+.dialog.dialog-wide td {
+  padding: 0.4rem;
+  text-align: center;
+}
+
+.dialog.dialog-wide td:first-child { text-align: left; color: var(--text-bright); }
+
+.dialog.dialog-wide select {
+  min-width: 70px;
+}
+
 .dialog h3 {
   font-family: var(--font-display);
   margin-bottom: 0.8rem;
@@ -1197,6 +1266,7 @@ function renderHistory() {
           </div>
           <div style="display:flex;align-items:center;gap:1rem;">
             <span class="game-date">${g.date}</span>
+            <button class="btn btn-sm" onclick="event.stopPropagation();editGame(${idx})">编辑</button>
             <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteGame(${idx})">删除</button>
           </div>
         </div>
@@ -1237,6 +1307,163 @@ async function confirmDelete(idx) {
   renderHistory();
   renderLeaderboard();
   showToast('已删除');
+}
+
+async function updateGameApi(idx, game) {
+  try {
+    await fetch(`/api/games/${idx}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ game }),
+    });
+  } catch (e) {
+    localStorage.setItem('ww_games', JSON.stringify(games));
+  }
+}
+
+function editGame(idx) {
+  const g = games[idx];
+  const allRoleNames = Object.keys(ALL_ROLES);
+  const factionNames = { good: '好人', wolf: '狼人', third: '第三方' };
+
+  const playerRows = players.map((p, pi) => {
+    const entry = g.entries.find(e => e.player === p);
+    const roleOpts = allRoleNames.map(rName =>
+      `<option value="${rName}" ${entry && entry.role === rName ? 'selected' : ''}>${rName}</option>`
+    ).join('');
+
+    const isFollow = entry && ALL_ROLES[entry.role] && ALL_ROLES[entry.role].faction === 'follow';
+    const factionSelect = isFollow
+      ? `<select id="editFollow_${pi}">
+          <option value="">选择</option>
+          ${['good','wolf','third'].map(f => `<option value="${f}" ${entry.faction === f ? 'selected' : ''}>${factionNames[f]}</option>`).join('')}
+         </select>`
+      : '';
+
+    return `
+      <tr>
+        <td>${esc(p)}</td>
+        <td>
+          <select id="editRole_${pi}" onchange="onEditRoleChange(${pi})">
+            <option value="">未参与</option>
+            ${roleOpts}
+          </select>
+        </td>
+        <td id="editFaction_${pi}">${factionSelect}</td>
+      </tr>
+    `;
+  }).join('');
+
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay';
+  overlay.innerHTML = `
+    <div class="dialog dialog-wide">
+      <h3>编辑第 ${idx + 1} 局</h3>
+      <div style="margin-bottom:0.8rem;font-size:0.85rem;color:var(--text-dim)">获胜阵营</div>
+      <div class="edit-winner-select">
+        <button class="edit-winner-btn ${g.winner === 'good' ? 'active-good' : ''}" onclick="setEditWinner(this,'good')">好人</button>
+        <button class="edit-winner-btn ${g.winner === 'wolf' ? 'active-wolf' : ''}" onclick="setEditWinner(this,'wolf')">狼人</button>
+        <button class="edit-winner-btn ${g.winner === 'third' ? 'active-third' : ''}" onclick="setEditWinner(this,'third')">第三方</button>
+      </div>
+      <table>
+        <tr><th>玩家</th><th>身份</th><th>阵营</th></tr>
+        ${playerRows}
+      </table>
+      <div class="btn-group" style="justify-content:flex-end;">
+        <button class="btn" onclick="this.closest('.overlay').remove()">取消</button>
+        <button class="btn btn-primary" onclick="confirmEdit(${idx});this.closest('.overlay').remove()">保存</button>
+      </div>
+    </div>
+  `;
+  overlay.dataset.winner = g.winner;
+  document.body.appendChild(overlay);
+
+  // Update faction display for non-follow roles
+  players.forEach((p, pi) => {
+    onEditRoleChange(pi);
+  });
+
+  // Restore selected values after onEditRoleChange resets them
+  players.forEach((p, pi) => {
+    const entry = g.entries.find(e => e.player === p);
+    if (entry) {
+      const roleSelect = document.getElementById(`editRole_${pi}`);
+      roleSelect.value = entry.role;
+      onEditRoleChange(pi);
+      const followSel = document.getElementById(`editFollow_${pi}`);
+      if (followSel) followSel.value = entry.faction;
+    }
+  });
+}
+
+function setEditWinner(btn, faction) {
+  const container = btn.parentElement;
+  container.querySelectorAll('.edit-winner-btn').forEach(b => b.className = 'edit-winner-btn');
+  btn.className = 'edit-winner-btn active-' + faction;
+  btn.closest('.overlay').dataset.winner = faction;
+}
+
+function onEditRoleChange(pi) {
+  const roleSelect = document.getElementById(`editRole_${pi}`);
+  const factionCell = document.getElementById(`editFaction_${pi}`);
+  const role = ALL_ROLES[roleSelect.value];
+  const factionNames = { good: '好人', wolf: '狼人', third: '第三方' };
+
+  if (!role) {
+    factionCell.innerHTML = '';
+    return;
+  }
+
+  if (role.faction === 'follow') {
+    if (!document.getElementById(`editFollow_${pi}`)) {
+      factionCell.innerHTML = `
+        <select id="editFollow_${pi}">
+          <option value="">选择</option>
+          <option value="good">好人</option>
+          <option value="wolf">狼人</option>
+          <option value="third">第三方</option>
+        </select>
+      `;
+    }
+  } else {
+    factionCell.innerHTML = `<span class="faction-${role.faction}">${factionNames[role.faction]}</span>`;
+  }
+}
+
+async function confirmEdit(idx) {
+  const overlay = document.querySelector('.overlay');
+  const winner = overlay.dataset.winner;
+  const factionNames = { good: '好人', wolf: '狼人', third: '第三方' };
+
+  const entries = [];
+  players.forEach((p, pi) => {
+    const roleName = document.getElementById(`editRole_${pi}`).value;
+    if (!roleName) return;
+    const role = ALL_ROLES[roleName];
+    let faction = role.faction;
+    if (faction === 'follow') {
+      const sel = document.getElementById(`editFollow_${pi}`);
+      faction = sel ? sel.value : '';
+    }
+    if (!faction || !FACTION_SCORES[faction]) return;
+    const scores = FACTION_SCORES[faction];
+    const total = faction === winner ? scores.win : scores.lose;
+    entries.push({ player: p, role: roleName, faction, total });
+  });
+
+  if (entries.length === 0) { showToast('请至少保留一位玩家'); return; }
+
+  const game = {
+    ...games[idx],
+    winner,
+    entries,
+  };
+
+  games[idx] = game;
+  await updateGameApi(idx, game);
+  renderHistory();
+  renderLeaderboard();
+  showToast('已更新第 ' + (idx + 1) + ' 局');
 }
 
 // ======================== LEADERBOARD ========================

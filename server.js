@@ -150,6 +150,21 @@ app.post('/api/games', (req, res) => {
   });
 });
 
+// Update a game
+app.put('/api/games/:idx', (req, res) => {
+  withLock(async () => {
+    const data = readData();
+    const idx = parseInt(req.params.idx);
+    if (idx >= 0 && idx < data.games.length) {
+      data.games[idx] = req.body.game;
+      writeData(data);
+      res.json({ ok: true });
+    } else {
+      res.status(404).json({ error: 'not found' });
+    }
+  });
+});
+
 // Delete a game
 app.delete('/api/games/:idx', (req, res) => {
   withLock(async () => {
